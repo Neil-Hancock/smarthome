@@ -1,0 +1,51 @@
+vesync:
+  username: user@gmail.com
+  password: vesyncpassword
+  time_zone: America/New_York
+
+wyze:
+  username: user@gmail.com
+  password: wyzepassword
+
+open_weather_map:
+  api_key: 1234567890abcdef
+  lattitude: 50.05
+  longitude: 80.08
+
+pushbullet:
+  api_key: o.1234567890abcdef
+
+spontit:
+  api_key: 1234567890abcdef
+  username: user
+  testing_channel: testing
+  prod_channel: smarthome
+
+cameras:
+  update_frequency: 3 * 60
+  on_time: 1:00
+  off_time: 7:00
+
+lights:
+  update_frequency:
+    home: 8
+    away: 3 * 60
+  ambient: #offset in seconds from sunrise/sunset
+    daytime:
+        rise_offset: -30 * 60
+        set_offset: 45 * 60
+    dawn:
+        rise_offset: 30 * 60
+    dusk:
+        set_offset: 2 * 60 * 60
+
+runtime:
+  Device Name: 3 * 60 * 60
+  Device Name2: 4 * 60 * 60
+
+location:
+  retry_count: 4
+  ip_range: 10.0.0.0-100
+  phone_macs:
+    - F0:AA:BB:CC:DD:EE #Phone1
+    - B6:AA:BB:CC:DD:EE #Phone2
