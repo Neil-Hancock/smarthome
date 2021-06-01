@@ -2,6 +2,7 @@ import datetime
 from enum import Enum
 import logging
 import time
+import requests
 from clients.location import Location
 from clients.wyze import PowerStates, WyzeClient
 
@@ -31,7 +32,10 @@ def main(config: dict, wyze_client: WyzeClient, location: Location):
         turn_on = not location.is_anyone_home() or scheduler.is_scheduled_on()
         if last_check == turn_on:
             power_state = PowerStates.POWER_ON if turn_on else PowerStates.POWER_OFF
-            wyze_client.set_power_state(Cameras.LIVING_ROOM.value, power_state)
-            wyze_client.set_power_state(Cameras.NURSERY.value, power_state)
+            try:
+                wyze_client.set_power_state(Cameras.LIVING_ROOM.value, power_state)
+                wyze_client.set_power_state(Cameras.NURSERY.value, power_state)
+            except requests.exceptions.ConnectionError as conn_error:
+                _LOGGER.error(f'Connection Error, retrying next update cycle', exc_info=conn_error)
         last_check = turn_on
         time.sleep(UPDATE_FREQUENCY)

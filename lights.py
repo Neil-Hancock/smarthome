@@ -1,6 +1,8 @@
+from sys import exc_info
 import time
 import logging
 from enum import Enum
+import requests
 from pyvesync_v2.vesyncbasedevice import VeSyncBaseDevice
 from pyvesync_v2.vesyncoutlet import VeSyncOutlet
 from wyzeapy.base_client import Device
@@ -204,8 +206,11 @@ def main(config: dict, wyze_client: WyzeClient, location: Location):
             lights.check_sensor_wyze(Devices.NURSERY_SENSOR, Devices.NURSERY_BULB)
             lights.check_sensor_power(Devices.NURSERY_SENSOR, Devices.NURSERY_FEEDING_LAMP)
             runtime.check()
-        except KeyError as error:
-            _LOGGER.error(f'KeyError, device missing for key "{error.args[0]}"')
-        
+        except KeyError as key_error:
+            _LOGGER.error(f'KeyError, device missing for key "{key_error.args[0]}"')
+        except requests.exceptions.ConnectionError as conn_error:
+            _LOGGER.error(f'Connection Error, retrying after a delay', exc_info=conn_error)
+            time.sleep(AWAY_UPDATE_FREQUENCY)
+
         time.sleep(HOME_UPDATE_FREQUENCY if location.is_anyone_home(cached=True) else AWAY_UPDATE_FREQUENCY)
         vesync_manager.smart_update()
