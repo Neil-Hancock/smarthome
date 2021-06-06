@@ -99,7 +99,7 @@ class WyzeClient(Client):
     #         "sc": "9f275790cab94a72bd206c8876429f3c",
     #         "ts": int(time.time()),
     #         "sv": "9d74946e652647e9b6c9d59326aef104",
-    #         "access_token": self.client.access_token,
+    #         "access_token": self.net_client.access_token,
     #         "phone_id": PHONE_ID,
     #         "app_name": APP_NAME,
     #         "provider_key": device.product_model,
@@ -121,17 +121,17 @@ class WyzeClient(Client):
             "sc": "9f275790cab94a72bd206c8876429f3c",
             "ts": int(time.time()),
             "sv": "9d74946e652647e9b6c9d59326aef104",
-            "access_token": self.client.access_token,
+            "access_token": self.net_client.access_token,
             "phone_id": PHONE_ID,
             "app_name": APP_NAME,
-            "refresh_token": self.client.refresh_token,
+            "refresh_token": self.net_client.refresh_token,
         }
 
         response_json = requests.post("https://api.wyzecam.com/app/user/refresh_token", json=payload).json()
         NetClient.check_for_errors(response_json)
         try:
-            self.client.access_token = response_json['data']['access_token']
-            self.client.refresh_token = response_json['data']['refresh_token']
+            self.net_client.access_token = response_json['data']['access_token']
+            self.net_client.refresh_token = response_json['data']['refresh_token']
             return True
         except KeyError:
             raise UnknownApiError(response_json)
