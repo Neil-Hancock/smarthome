@@ -30,10 +30,10 @@ class Location:
             nmap_out = self.get_nmap()
             for mac in self.phone_macs:
                 if mac in nmap_out:
-                    if i < self.RETRY_COUNT - 2:
-                        _LOGGER.debug(f'Someone is home, took {i} iterations to check')
-                    else:
+                    if i == self.RETRY_COUNT - 1:
                         _LOGGER.info(f'Someone is home, took {i} iterations to check')
+                    else:
+                        _LOGGER.debug(f'Someone is home, took {i} iterations to check')
                     self._last_check = True
                     return self._last_check
 
