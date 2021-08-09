@@ -14,28 +14,40 @@ class Cameras(Enum):
     NURSERY = 'Nursery'
 
 class Scheduler():
-    def __init__(self, on_time: str, off_time: str) -> None:
-        self.on_time = datetime.time(hour=int(on_time.split(':')[0]), minute=int(on_time.split(':')[1]))
-        self.off_time = datetime.time(hour=int(off_time.split(':')[0]), minute=int(off_time.split(':')[1]))
+    def __init__(self) -> None:
+        self._config = {}
 
-    def is_scheduled_on(self) -> bool:
+    def add(self, camera: Cameras, on_time: str, off_time: str):
+        """Adds a camera to the scheduler, or updates the schedule if it already exists"""
+        if camera is None or on_time is None or off_time is None:
+            raise TypeError('All 3 args must be set')
+        if camera.value not in self._config:
+            self._config[camera.value] = {'on_time': None, 'off_time': None}
+        self._config[camera.value]['on_time'] = datetime.time(hour=int(on_time.split(':')[0]), minute=int(on_time.split(':')[1]))
+        self._config[camera.value]['off_time'] = datetime.time(hour=int(off_time.split(':')[0]), minute=int(off_time.split(':')[1]))
+
+    def is_scheduled_on(self, camera: Cameras,) -> bool:
+        assert camera.value in self._config
         now = datetime.datetime.now().time()
-        return self.on_time < now and self.off_time  > now
+        return self._config[camera.value]['on_time'] < now and self._config[camera.value]['off_time']  > now
 
 def main(config: dict, wyze_client: WyzeClient, location: Location):
     cameras = config['cameras']
     UPDATE_FREQUENCY = cameras['update_frequency']
-    scheduler = Scheduler(cameras['on_time'], cameras['off_time'])
-    last_check = True
+    scheduler = Scheduler()
+    last_check = {}
+    for key, val in cameras['scheduler'].items():
+        scheduler.add(Cameras(key), val['on_time'], val['off_time'])
+        last_check[key] = True
 
     while(True):
-        turn_on = not location.is_anyone_home() or scheduler.is_scheduled_on()
-        if last_check == turn_on:
-            power_state = PowerStates.POWER_ON if turn_on else PowerStates.POWER_OFF
-            try:
-                wyze_client.set_power_state(Cameras.LIVING_ROOM.value, power_state)
-                wyze_client.set_power_state(Cameras.NURSERY.value, power_state)
-            except requests.exceptions.ConnectionError as conn_error:
-                _LOGGER.error(f'Connection Error, retrying next update cycle', exc_info=conn_error)
-        last_check = turn_on
+        for camera in Cameras:
+            turn_on = not location.is_anyone_home() or scheduler.is_scheduled_on(camera)
+            if last_check[camera.value] == turn_on:
+                power_state = PowerStates.POWER_ON if turn_on else PowerStates.POWER_OFF
+                try:
+                    wyze_client.set_power_state(camera.value, power_state)
+                except requests.exceptions.ConnectionError as conn_error:
+                    _LOGGER.error(f'Connection Error, retrying next update cycle', exc_info=conn_error)
+            last_check[camera.value] = turn_on
         time.sleep(UPDATE_FREQUENCY)

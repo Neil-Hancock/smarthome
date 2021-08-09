@@ -23,8 +23,13 @@ spontit:
 
 cameras:
   update_frequency: 3 * 60
-  on_time: 1:00
-  off_time: 7:00
+  scheduler:
+    Example Camera1:
+      on_time: 2:30
+      off_time: 8:00
+    Example Camera2:
+      on_time: 20:30
+      off_time: 9:00
 
 lights:
   update_frequency:
@@ -40,8 +45,8 @@ lights:
         set_offset: 2 * 60 * 60
 
 runtime:
-  Device Name: 3 * 60 * 60
-  Device Name2: 4 * 60 * 60
+  Example Device1: 3 * 60 * 60
+  Example Device2: 4 * 60 * 60
 
 location:
   retry_count: 4
