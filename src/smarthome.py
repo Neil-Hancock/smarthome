@@ -48,7 +48,7 @@ def load_config() -> dict:
     yaml = YAML(typ='safe')
 
     config = None
-    with open(path.dirname(__file__) + '/config.yaml') as file:
+    with open(path.dirname(__file__) + '/../config.yaml') as file:
         config = yaml.load(file)
     check_numeric(config)
     return config
