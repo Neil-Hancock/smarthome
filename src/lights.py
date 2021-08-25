@@ -171,12 +171,12 @@ class Lights:
                 _LOGGER.info('configuring bulb for nighttime...')
                 self.wyze_client.set_brightness(bulb, 30)
     
-    def is_feeding_time() -> bool:
+    def is_feeding_time(self) -> bool:
         """Check if it's feeding time
            TODO load start/stop time from yaml"""
 
-        start = datetime.time(hour=7, minute=30)
-        stop = datetime.time(hour=9, minute=0)
+        start = datetime.time(hour=19, minute=30)
+        stop = datetime.time(hour=21, minute=0)
         now = datetime.datetime.now().time()
 
         return start < now and stop > now
