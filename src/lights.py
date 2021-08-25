@@ -1,4 +1,5 @@
 from sys import exc_info
+import datetime
 import time
 import logging
 from enum import Enum
@@ -142,6 +143,14 @@ class Lights:
             self.wyze_client.turn_on(bulb)
             return
 
+        #fixed shedule based config
+        if self.is_feeding_time():
+            _LOGGER.info('configuring bulb for feeding time...')
+            self.wyze_client.set_color(bulb, 'FF2000')
+            self.wyze_client.set_brightness(bulb, 75)
+            return
+
+        #config based on ambient conditions
         if self.weather_client.is_sun_in_range(self.ambient_config['daytime']['rise_offset'], self.ambient_config['daytime']['set_offset']):
             _LOGGER.info('configuring bulb for daytime...')
             self.wyze_client.set_color_temp(bulb, 3469)
@@ -161,6 +170,16 @@ class Lights:
             else:
                 _LOGGER.info('configuring bulb for nighttime...')
                 self.wyze_client.set_brightness(bulb, 30)
+    
+    def is_feeding_time() -> bool:
+        """Check if it's feeding time
+           TODO load start/stop time from yaml"""
+
+        start = datetime.time(hour=7, minute=30)
+        stop = datetime.time(hour=9, minute=0)
+        now = datetime.datetime.now().time()
+
+        return start < now and stop > now
 
 def is_connected(device: VeSyncBaseDevice) -> bool:
     """Return true if VeSync device is connected."""
