@@ -22,8 +22,11 @@ spontit:
   prod_channel: smarthome
 
 cameras:
+  device_names: #control state (off when home, on when away)
+    - Example Camera1
+    - Example Camera2
   update_frequency: 3 * 60
-  scheduler:
+  scheduler: #optional per camera schedule
     Example Camera1:
       on_time: 2:30
       off_time: 8:00
@@ -32,9 +35,36 @@ cameras:
       off_time: 9:00
 
 lights:
+  device_names: #for reference only, not used
+    #VeSync
+    - Example VeSync Sensor1
+    - Example VeSync Light1
+    - Example VeSync Sensor2
+    - Example VeSync Light2
+    - Example VeSync Device1
+    - Example VeSync Device2
+    - Example VeSync Light3
+    - Example VeSync Light4
+    #Wyze
+    - Example Wyze Bulb1
+  check_ambient_enabled:
+    - Example VeSync Light1
+    - Example Wyze Bulb1
   update_frequency:
     home: 8
     away: 3 * 60
+  method_device_mapping:
+    vesync-vesync_state:
+      Example VeSync Sensor1: Example VeSync Light1
+    vesync-vesync_power:
+      Example VeSync Sensor2: Example VeSync Light2
+    vesync-wyze_state:
+      Example VeSync Sensor2: Example Wyze Bulb1
+  away_auto_off:
+    time_variance: 30 
+    devices: #daily off time is stated time +/- time_variance
+      Example VeSync Light3: 00:00
+      Example VeSync Light4: 00:00
   ambient: #offset in seconds from sunrise/sunset
     daytime:
         rise_offset: -30 * 60
@@ -45,8 +75,8 @@ lights:
         set_offset: 2 * 60 * 60
 
 runtime:
-  Example Device1: 3 * 60 * 60
-  Example Device2: 4 * 60 * 60
+  Example VeSync Device1: 3 * 60 * 60
+  Example VeSync Device2: 4 * 60 * 60
 
 location:
   retry_count: 5

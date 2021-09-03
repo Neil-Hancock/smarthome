@@ -1,5 +1,4 @@
 import datetime
-from enum import Enum
 import logging
 import time
 import requests
@@ -8,32 +7,27 @@ from clients.wyze import PowerStates, WyzeClient
 
 _LOGGER = logging.getLogger(__name__)
 
-class Cameras(Enum):
-    """Manage state of the following cameras"""
-    LIVING_ROOM = 'Living Room'
-    #NURSERY = 'Nursery'
-
 class Scheduler():
     def __init__(self) -> None:
         self._config = {}
 
-    def add(self, camera: Cameras, on_time: str, off_time: str):
+    def add(self, camera: str, on_time: str, off_time: str):
         """Adds a camera to the scheduler, or updates the schedule if it already exists"""
         if camera is None or on_time is None or off_time is None:
             raise TypeError('All 3 args must be set and not None')
         if on_time == off_time:
             raise ValueError('on_time and off_time must be different values')
-        if camera.value not in self._config:
-            self._config[camera.value] = {'on_time': None, 'off_time': None}
-        self._config[camera.value]['on_time'] = datetime.time(hour=int(on_time.split(':')[0]), minute=int(on_time.split(':')[1]))
-        self._config[camera.value]['off_time'] = datetime.time(hour=int(off_time.split(':')[0]), minute=int(off_time.split(':')[1]))
+        if camera not in self._config:
+            self._config[camera] = {'on_time': None, 'off_time': None}
+        self._config[camera]['on_time'] = datetime.time(hour=int(on_time.split(':')[0]), minute=int(on_time.split(':')[1]))
+        self._config[camera]['off_time'] = datetime.time(hour=int(off_time.split(':')[0]), minute=int(off_time.split(':')[1]))
 
-    def is_scheduled_on(self, camera: Cameras) -> bool:
+    def is_scheduled_on(self, camera: str) -> bool:
         """Checks if the camera is schedules to be on, or returns True if no schedule is configured"""
-        if  camera.value not in self._config:
+        if  camera not in self._config:
             return True
-        on_time = self._config[camera.value]['on_time']
-        off_time = self._config[camera.value]['off_time'] 
+        on_time = self._config[camera]['on_time']
+        off_time = self._config[camera]['off_time'] 
         assert on_time is not None and off_time is not None
         now = datetime.datetime.now().time()
         if on_time < off_time:
@@ -47,17 +41,17 @@ def main(config: dict, wyze_client: WyzeClient, location: Location):
     scheduler = Scheduler()
     last_check = {}
     for key, val in cameras['scheduler'].items():
-        scheduler.add(Cameras(key), val['on_time'], val['off_time'])
+        scheduler.add(key, val['on_time'], val['off_time'])
         last_check[key] = True
 
     while(True):
-        for camera in Cameras:
+        for camera in cameras['device_names']:
             turn_on = not location.is_anyone_home() or scheduler.is_scheduled_on(camera)
-            if last_check[camera.value] == turn_on:
+            if last_check[camera] == turn_on:
                 power_state = PowerStates.POWER_ON if turn_on else PowerStates.POWER_OFF
                 try:
-                    wyze_client.set_power_state(camera.value, power_state)
+                    wyze_client.set_power_state(camera, power_state)
                 except requests.exceptions.ConnectionError as conn_error:
                     _LOGGER.error(f'Connection Error, retrying next update cycle', exc_info=conn_error)
-            last_check[camera.value] = turn_on
+            last_check[camera] = turn_on
         time.sleep(UPDATE_FREQUENCY)
