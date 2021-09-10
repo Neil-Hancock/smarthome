@@ -51,6 +51,7 @@ class WyzeClient(Client):
         return False
 
     def get_device_by_nickname(self, nickname) -> Device:
+        self.update_devices()
         with self._devices_lock:
             return self._devices[nickname]
 
@@ -62,7 +63,6 @@ class WyzeClient(Client):
         ]:
             raise ActionNotSupported(device.product_type)
 
-        self.update_devices()
         if device_type == DeviceTypes.CAMERA:
             return bool(int(device.device_params['power_switch']))
         if device_type == DeviceTypes.MESH_LIGHT:

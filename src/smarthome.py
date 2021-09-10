@@ -1,4 +1,3 @@
-import datetime
 import re
 import threading
 from os import path
@@ -31,6 +30,7 @@ def check_numeric(config) -> dict:
     cams = config['cameras']
     cams['update_frequency'] = eval_numeric(cams['update_frequency'])
     
+    config['lights']['away_auto_off']['time_variance'] = eval_numeric(config['lights']['away_auto_off']['time_variance'])
     l_up = config['lights']['update_frequency']
     l_up['home'] = eval_numeric(l_up['home'])
     l_up['away'] = eval_numeric(l_up['away'])

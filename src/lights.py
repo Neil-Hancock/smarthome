@@ -1,8 +1,8 @@
-from sys import exc_info
 import datetime
+from json.decoder import JSONDecodeError
 import time
 import logging
-from enum import Enum
+from random import randint
 import requests
 from pyvesync_v2.vesyncbasedevice import VeSyncBaseDevice
 from pyvesync_v2.vesyncoutlet import VeSyncOutlet
@@ -34,7 +34,7 @@ class Runtime:
             raise TypeError('Both args must be set')
         if int(max_time) < 1:
             raise ValueError('max_time must be greater than 0')
-
+        
         if outlet in self._config:
             self._config[outlet]['max_time'] = max_time
         else:
@@ -42,32 +42,64 @@ class Runtime:
 
     def check(self):
         """Checks all configured outlets against their max runtime"""
-        for outlet in self.configured_outlets:
+        for outlet, times in self._config.items():
+            assert times['max_time'] is not None and times['start'] is not None
             outlet_vesync = self.vesync_manager.get_device_by_name(outlet)
             if not outlet_vesync.is_on:
                 outlet_vesync.turn_on()
             if outlet_vesync.power <= 2:
-                self._set_start_time(outlet, 0)
+                times['start'] = 0
             else:
-                if self.is_max_time_exceeded(outlet):
+                if self.is_max_time_exceeded(times):
                     cycle_state(outlet_vesync)
-                    self._set_start_time(outlet, 0)
+                    times['start'] = 0
                     _LOGGER.info(f'{outlet} run time exceeded')
-                elif self._get_start_time(outlet) == 0:
-                    self._set_start_time(outlet, time.time())
+                elif times['start'] == 0:
+                    times['start'] = time.time()
                     _LOGGER.info(f'{outlet} turned on')
 
-    def _get_start_time(self, outlet: str) -> float:
-        return self._config[outlet]['start']
+    def is_max_time_exceeded(self, times: dict) -> bool:
+        return times['start'] > 0 and time.time() - times['start']  > times['max_time']
 
-    def _set_start_time(self, outlet: str, time):
-        self._config[outlet]['start'] = time
+class AwayAutoOff:
+    def __init__(self, time_variance: int, vesync_manager: SmartVeSync) -> None:
+        if int(time_variance) < 0:
+            raise ValueError('time_variance must be positive')
+        self.time_variance = time_variance
+        self.vesync_manager = vesync_manager
+        self._config = {}
 
-    def _get_max_time(self, outlet: str) -> int:
-        return self._config[outlet]['max_time']
+    def _vary_time(self, time: datetime.time) -> time:
+        date = datetime.datetime(1970, 1, 1, time.hour, time.minute, time.second, tzinfo=datetime.timezone.utc)
+        delta = datetime.timedelta(seconds=randint(-self.time_variance, self.time_variance))
+        return (date + delta).time()
 
-    def is_max_time_exceeded(self, outlet: str) -> bool:
-        return self._get_start_time(outlet) > 0 and time.time() - self._get_start_time(outlet)  > self._get_max_time(outlet)
+    def add(self, lamp: str, off_time: str):
+        """Adds a lamp to the away auto off scheduler, or updates the off time if it already exists"""
+        if lamp is None or off_time is None:
+            raise TypeError('Both args must be set and not None')
+        if lamp not in self._config:
+            self._config[lamp] = {'off_time': None, 'actual_off_time': None}
+        off_time = datetime.time(hour=int(off_time.split(':')[0]), minute=int(off_time.split(':')[1]))
+        self._config[lamp]['off_time'] = off_time
+        self._config[lamp]['actual_off_time'] = self._vary_time(off_time)
+        _LOGGER.info(f"added {lamp} to away auto off, {self._config[lamp]}")
+
+    def check(self) -> None:
+        """Checks all configured lamps against their off time, only call in away mode"""
+        for lamp, times in self._config.items():
+            assert times['off_time'] is not None and times['actual_off_time'] is not None
+            outlet_vesync = self.vesync_manager.get_device_by_name(lamp)
+            now = datetime.datetime.now().time()
+            if outlet_vesync.is_on and now > times['actual_off_time']:
+                #TODO fix for off_time of midnight or later
+                #      if on_time < off_time:
+                #     return on_time < now and off_time > now
+                # else:
+                #     return not (off_time < now and on_time > now)
+                outlet_vesync.turn_off()
+                _LOGGER.info(f'turned off {lamp} as per away auto off schedule')
+                times['actual_off_time'] = self._vary_time(times['actual_off_time'])
 
 class Lights:
     def __init__(self, check_ambient_enabled: list, ambient_config: dict, vesync_manager: SmartVeSync, wyze_client: WyzeClient, weather_client: OpenWeatherMap) -> None:
@@ -157,7 +189,7 @@ class Lights:
         """Check if it's feeding time
            TODO load start/stop time from yaml"""
 
-        start = datetime.time(hour=19, minute=30)
+        start = datetime.time(hour=19, minute=00)
         stop = datetime.time(hour=21, minute=0)
         now = datetime.datetime.now().time()
 
@@ -187,7 +219,7 @@ def main(config: dict, wyze_client: WyzeClient, location: Location):
     lights_config = config['lights']
     HOME_UPDATE_FREQUENCY = lights_config['update_frequency']['home']
     AWAY_UPDATE_FREQUENCY = lights_config['update_frequency']['away']
-    vesync = config['vesync']
+    
 
     #figure out which vesync devices require details
     update_details = []
@@ -196,6 +228,7 @@ def main(config: dict, wyze_client: WyzeClient, location: Location):
     for key, _ in config['runtime'].items():
         update_details.append(key)
 
+    vesync = config['vesync']
     vesync_manager = SmartVeSync(vesync['username'], vesync['password'], vesync['time_zone'], update_details)
     vesync_manager.update_interval = HOME_UPDATE_FREQUENCY
     vesync_manager.login()
@@ -207,6 +240,9 @@ def main(config: dict, wyze_client: WyzeClient, location: Location):
     runtime = Runtime(vesync_manager)
     for key, val in config['runtime'].items():
         runtime.add(key, val)
+    away_auto_off = AwayAutoOff(lights_config['away_auto_off']['time_variance'], vesync_manager)
+    for key, val in lights_config['away_auto_off']['devices'].items():
+            away_auto_off.add(key, val)
 
     while True:
         try:
@@ -223,11 +259,15 @@ def main(config: dict, wyze_client: WyzeClient, location: Location):
                 lights.check_sensor_wyze(sensor, light)
 
             runtime.check()
+            if not location.is_anyone_home(cached=True) and not location.is_anyone_home():
+                away_auto_off.check()
         except KeyError as key_error:
             _LOGGER.error(f'KeyError, device missing for key "{key_error.args[0]}"')
         except requests.exceptions.ConnectionError as conn_error:
             _LOGGER.error(f'Connection Error, retrying after a delay', exc_info=conn_error)
             time.sleep(AWAY_UPDATE_FREQUENCY)
+        except JSONDecodeError as json_error:
+            _LOGGER.error(f'JSON Decode Error, retrying after a delay. JSON Response: {json_error.doc}', exc_info=json_error)
+            time.sleep(AWAY_UPDATE_FREQUENCY)
 
         time.sleep(HOME_UPDATE_FREQUENCY if location.is_anyone_home(cached=True) else AWAY_UPDATE_FREQUENCY)
-        vesync_manager.smart_update()

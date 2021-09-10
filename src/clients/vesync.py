@@ -15,6 +15,7 @@ class SmartVeSync(VeSync):
         self._devices = {}
 
     def get_device_by_name(self, name: str) -> VeSyncBaseDevice:
+        self.smart_update()
         with self._devices_lock:
             return self._devices[name]
 

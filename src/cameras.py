@@ -1,4 +1,5 @@
 import datetime
+from json.decoder import JSONDecodeError
 import logging
 import time
 import requests
@@ -53,5 +54,7 @@ def main(config: dict, wyze_client: WyzeClient, location: Location):
                     wyze_client.set_power_state(camera, power_state)
                 except requests.exceptions.ConnectionError as conn_error:
                     _LOGGER.error(f'Connection Error, retrying next update cycle', exc_info=conn_error)
+                except JSONDecodeError as json_error:
+                    _LOGGER.error(f'JSON Decode Error, retrying next update cycle. JSON Response: {json_error.doc}', exc_info=json_error)
             last_check[camera] = turn_on
         time.sleep(UPDATE_FREQUENCY)

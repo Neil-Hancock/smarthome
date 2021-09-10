@@ -60,11 +60,11 @@ lights:
       Example VeSync Sensor2: Example VeSync Light2
     vesync-wyze_state:
       Example VeSync Sensor2: Example Wyze Bulb1
-  away_auto_off:
-    time_variance: 30 
+  away_auto_off: #VeSync only
+    time_variance: 30 * 60
     devices: #daily off time is stated time +/- time_variance
-      Example VeSync Light3: 00:00
-      Example VeSync Light4: 00:00
+      Example VeSync Light3: 23:00
+      Example VeSync Light4: 23:00
   ambient: #offset in seconds from sunrise/sunset
     daytime:
         rise_offset: -30 * 60
@@ -74,7 +74,7 @@ lights:
     dusk:
         set_offset: 2 * 60 * 60
 
-runtime:
+runtime: #VeSync only
   Example VeSync Device1: 3 * 60 * 60
   Example VeSync Device2: 4 * 60 * 60
 
