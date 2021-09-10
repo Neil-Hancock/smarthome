@@ -62,10 +62,11 @@ class Runtime:
         return times['start'] > 0 and time.time() - times['start']  > times['max_time']
 
 class AwayAutoOff:
-    def __init__(self, time_variance: int, vesync_manager: SmartVeSync) -> None:
+    def __init__(self, time_variance: int, new_day_time, vesync_manager: SmartVeSync) -> None:
         if int(time_variance) < 0:
             raise ValueError('time_variance must be positive')
         self.time_variance = time_variance
+        self.new_day_time = datetime.time(hour=int(new_day_time.split(':')[0]), minute=int(new_day_time.split(':')[1]))
         self.vesync_manager = vesync_manager
         self._config = {}
 
@@ -87,16 +88,14 @@ class AwayAutoOff:
 
     def check(self) -> None:
         """Checks all configured lamps against their off time, only call in away mode"""
+        now = datetime.datetime.now().time()
         for lamp, times in self._config.items():
-            assert times['off_time'] is not None and times['actual_off_time'] is not None
             outlet_vesync = self.vesync_manager.get_device_by_name(lamp)
-            now = datetime.datetime.now().time()
-            if outlet_vesync.is_on and now > times['actual_off_time']:
-                #TODO fix for off_time of midnight or later
-                #      if on_time < off_time:
-                #     return on_time < now and off_time > now
-                # else:
-                #     return not (off_time < now and on_time > now)
+            if not outlet_vesync.is_on:
+                continue
+            assert times['off_time'] is not None and times['actual_off_time'] is not None
+            if (times['actual_off_time'] > self.new_day_time and times['actual_off_time'] < now) or \
+               (times['actual_off_time'] < now and self.new_day_time > now):
                 outlet_vesync.turn_off()
                 _LOGGER.info(f'turned off {lamp} as per away auto off schedule')
                 times['actual_off_time'] = self._vary_time(times['actual_off_time'])
@@ -240,8 +239,9 @@ def main(config: dict, wyze_client: WyzeClient, location: Location):
     runtime = Runtime(vesync_manager)
     for key, val in config['runtime'].items():
         runtime.add(key, val)
-    away_auto_off = AwayAutoOff(lights_config['away_auto_off']['time_variance'], vesync_manager)
-    for key, val in lights_config['away_auto_off']['devices'].items():
+    away_config = lights_config['away_auto_off']
+    away_auto_off = AwayAutoOff(away_config['time_variance'], away_config['new_day_time'], vesync_manager)
+    for key, val in away_config['devices'].items():
             away_auto_off.add(key, val)
 
     while True:

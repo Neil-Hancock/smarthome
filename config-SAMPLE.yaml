@@ -62,8 +62,9 @@ lights:
       Example VeSync Sensor2: Example Wyze Bulb1
   away_auto_off: #VeSync only
     time_variance: 30 * 60
+    new_day_time: 8:00 #new day starts at this time, support away_auto_off after midnight
     devices: #daily off time is stated time +/- time_variance
-      Example VeSync Light3: 23:00
+      Example VeSync Light3: 1:00
       Example VeSync Light4: 23:00
   ambient: #offset in seconds from sunrise/sunset
     daytime:
