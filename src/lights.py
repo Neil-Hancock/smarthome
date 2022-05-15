@@ -4,8 +4,9 @@ import time
 import logging
 from random import randint
 import requests
-from pyvesync_v2.vesyncbasedevice import VeSyncBaseDevice
-from pyvesync_v2.vesyncoutlet import VeSyncOutlet
+from pyvesync.vesyncbasedevice import VeSyncBaseDevice
+from pyvesync.vesyncoutlet import VeSyncOutlet
+from wyzeapy.exceptions import UnknownApiError
 from wyzeapy.base_client import Device
 from clients.location import Location
 from clients.vesync import  SmartVeSync
@@ -269,5 +270,9 @@ def main(config: dict, wyze_client: WyzeClient, location: Location):
         except JSONDecodeError as json_error:
             _LOGGER.error(f'JSON Decode Error, retrying after a delay. JSON Response: {json_error.doc}', exc_info=json_error)
             time.sleep(AWAY_UPDATE_FREQUENCY)
+        except UnknownApiError as unknown_api_error:
+            _LOGGER.error(f'Unknown Wyze API Error, retrying after a delay', exc_info=unknown_api_error)
+            time.sleep(AWAY_UPDATE_FREQUENCY)
+
 
         time.sleep(HOME_UPDATE_FREQUENCY if location.is_anyone_home(cached=True) else AWAY_UPDATE_FREQUENCY)

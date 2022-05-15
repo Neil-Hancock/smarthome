@@ -2,8 +2,8 @@ from itertools import chain
 import logging
 import time
 import threading
-from pyvesync_v2 import VeSync
-from pyvesync_v2.vesyncbasedevice import VeSyncBaseDevice
+from pyvesync import VeSync
+from pyvesync.vesyncbasedevice import VeSyncBaseDevice
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -21,44 +21,32 @@ class SmartVeSync(VeSync):
 
     def _build_devices_dict(self):
         devices = {}
-        for device in self.device_chain:
+        for device in chain(*list(self._dev_list.values())):
             devices[device.device_name] = device
         with self._devices_lock:
             self._devices = devices
 
     def update(self):
-        super().update()
-        self._build_devices_dict()
+        if self.device_time_check():
+            super().update()
+            self._build_devices_dict()
 
     def smart_update(self):
         """Fetch updated information about devices."""
         if self.device_time_check():
 
-            if not self.in_process and self.enabled:
-                self.clear_devices()
-                outlets, switches, fans, bulbs = self.get_devices()
-                self.outlets.extend(outlets)
-                self.switches.extend(switches)
-                self.fans.extend(fans)
-                self.bulbs.extend(bulbs)
+            if not self.enabled:
+                _LOGGER.error('Not logged in to VeSync')
+                return
+            self.get_devices()
 
-                for device in self.device_chain:
-                    if (device.device_name in self.update_details):
-                        device.update()
+            devices = list(self._dev_list.values())
 
-                self.last_update_ts = time.time()
-                self._build_devices_dict()
-            else:
-                _LOGGER.error('You are not logged in to VeSync')
+            for device in chain(*devices):
+                 if (device.device_name in self.update_details):
+                     device.update()
 
-    @property
-    def device_chain(self):
-        devices = [self.outlets, self.bulbs, self.switches, self.fans]
-        return chain(*devices)
+            self.last_update_ts = time.time()
+            self._build_devices_dict()
 
-    def clear_devices(self):
-        self.outlets = []
-        self.switches = []
-        self.fans = []
-        self.bulbs = []
 
