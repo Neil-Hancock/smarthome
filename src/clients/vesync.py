@@ -38,6 +38,8 @@ class SmartVeSync(VeSync):
             if not self.enabled:
                 _LOGGER.error('Not logged in to VeSync')
                 return
+
+            self.clear_devices()
             self.get_devices()
 
             devices = list(self._dev_list.values())
@@ -49,4 +51,9 @@ class SmartVeSync(VeSync):
             self.last_update_ts = time.time()
             self._build_devices_dict()
 
-
+    def clear_devices(self):
+        self.outlets.clear()
+        self.switches.clear()
+        self.fans.clear()
+        self.bulbs.clear()
+        self.scales.clear()
