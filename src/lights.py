@@ -268,7 +268,7 @@ def main(config: dict, wyze_client: WyzeClient, location: Location):
             _LOGGER.error(f'Connection Error, retrying after a delay', exc_info=conn_error)
             time.sleep(AWAY_UPDATE_FREQUENCY)
         except JSONDecodeError as json_error:
-            _LOGGER.error(f'JSON Decode Error, retrying after a delay. JSON Response: {json_error.doc}', exc_info=json_error)
+            _LOGGER.error(f'JSON Decode Error, retrying after a delay', exc_info=json_error)
             time.sleep(AWAY_UPDATE_FREQUENCY)
         except UnknownApiError as unknown_api_error:
             _LOGGER.error(f'Unknown Wyze API Error, retrying after a delay', exc_info=unknown_api_error)
