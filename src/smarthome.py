@@ -40,9 +40,10 @@ def check_numeric(config) -> dict:
     amb['daytime']['set_offset'] = eval_numeric(amb['daytime']['set_offset'])
     amb['dawn']['rise_offset'] = eval_numeric(amb['dawn']['rise_offset'])
     amb['dusk']['set_offset'] = eval_numeric(amb['dusk']['set_offset'])
-    
-    for k, v in config['runtime'].items():
-        config['runtime'][k] = eval_numeric(v)
+
+    if config['runtime'] is not None:
+        for k, v in config['runtime'].items():
+            config['runtime'][k] = eval_numeric(v)
 
 def load_config() -> dict:
     yaml = YAML(typ='safe')

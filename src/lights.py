@@ -158,7 +158,7 @@ class Lights:
             return
 
         #fixed shedule based config
-        if self.is_feeding_time():
+        if self.is_bed_time():
             _LOGGER.info('configuring bulb for feeding time...')
             self.wyze_client.set_color(bulb, 'FF2000')
             self.wyze_client.set_brightness(bulb, 75)
@@ -185,12 +185,12 @@ class Lights:
                 _LOGGER.info('configuring bulb for nighttime...')
                 self.wyze_client.set_brightness(bulb, 30)
     
-    def is_feeding_time(self) -> bool:
-        """Check if it's feeding time
+    def is_bed_time(self) -> bool:
+        """Check if it's bed time
            TODO load start/stop time from yaml"""
 
         start = datetime.time(hour=19, minute=00)
-        stop = datetime.time(hour=21, minute=0)
+        stop = datetime.time(hour=21, minute=30)
         now = datetime.datetime.now().time()
 
         return start < now and stop > now
@@ -225,8 +225,9 @@ def main(config: dict, wyze_client: WyzeClient, location: Location):
     update_details = []
     for _, val in lights_config['method_device_mapping']['vesync-vesync_power'].items():
         update_details.append(val)
-    for key, _ in config['runtime'].items():
-        update_details.append(key)
+    if config['runtime'] is not None:
+        for key, _ in config['runtime'].items():
+            update_details.append(key)
 
     vesync = config['vesync']
     vesync_manager = SmartVeSync(vesync['username'], vesync['password'], vesync['time_zone'], update_details)
@@ -238,8 +239,11 @@ def main(config: dict, wyze_client: WyzeClient, location: Location):
     weather_client = OpenWeatherMap(weather['api_key'], weather['lattitude'], weather['longitude'])
     lights = Lights(lights_config['check_ambient_enabled'], lights_config['ambient'], vesync_manager, wyze_client, weather_client)
     runtime = Runtime(vesync_manager)
-    for key, val in config['runtime'].items():
-        runtime.add(key, val)
+
+    if config['runtime'] is not None:
+        for key, val in config['runtime'].items():
+            runtime.add(key, val)
+
     away_config = lights_config['away_auto_off']
     away_auto_off = AwayAutoOff(away_config['time_variance'], away_config['new_day_time'], vesync_manager)
     for key, val in away_config['devices'].items():

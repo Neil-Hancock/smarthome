@@ -7,6 +7,7 @@ import requests
 import threading
 from wyzeapy.client import Client
 from wyzeapy.base_client import *
+from wyzeapy.exceptions import AccessTokenError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -20,6 +21,7 @@ class WyzeClient(Client):
 
     def __init__(self, email, password):
         super().__init__(email, password)
+        self._devices = None
         self.update_interval = WyzeClient.UPDATE_INTERVAL
         self._devices_lock = threading.Lock()
         self._last_update_ts = None
