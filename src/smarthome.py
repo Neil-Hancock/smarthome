@@ -12,9 +12,10 @@ from ruamel.yaml import YAML
 
 import cameras, lights
 from clients.location import Location
-from clients.wyze import WyzeClient
+from clients.home_assistant import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
+
 
 def eval_numeric(val) -> Any:
     if isinstance(val, int):
@@ -24,6 +25,7 @@ def eval_numeric(val) -> Any:
         return eval(val)
     
     return val
+
 
 def check_numeric(config) -> dict:
     """Calls eval on select numeric values"""
@@ -45,6 +47,7 @@ def check_numeric(config) -> dict:
         for k, v in config['runtime'].items():
             config['runtime'][k] = eval_numeric(v)
 
+
 def load_config() -> dict:
     yaml = YAML(typ='safe')
 
@@ -54,23 +57,25 @@ def load_config() -> dict:
     check_numeric(config)
     return config
 
+
 def main():
     _LOGGER.info('Starting smarthome...')
     config = load_config()
-    wyze = config['wyze']
-    wyze_client = WyzeClient(wyze['username'], wyze['password'])
-    _LOGGER.info('Wyze devices updated')
+    # wyze = config['wyze']
+    home_assistant = HomeAssistant(config['home_assistant']['access_token'])
+    _LOGGER.info('Home Assistant configured')
 
     loc = config['location']
     location = Location(config['pushbullet']['api_key'], loc['retry_count'], loc['ip_range'], loc['phone_macs'])
 
     _LOGGER.info('Starting lights thread...')
-    threading.Thread(target=lights.main, args=(config, wyze_client, location,)).start()
+    threading.Thread(target=lights.main, args=(config, home_assistant, location,)).start()
 
     _LOGGER.info('Starting cameras thread...')
-    threading.Thread(target=cameras.main, args=(config, wyze_client, location,)).start()
+    threading.Thread(target=cameras.main, args=(config, home_assistant, location,)).start()
 
     _LOGGER.info('Both threads started')
+
 
 if __name__ == "__main__":
    main()

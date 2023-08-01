@@ -1,7 +1,7 @@
 #python >= 3.8
-requests==2.27.1
+requests==2.31.0
 pushbullet.py==0.12.0
-pyvesync==2.0.3
-ruamel.yaml==0.17.21
+pyvesync==2.1.8
+ruamel.yaml==0.17.32
 #spontit==1.0.8
-wyzeapy==0.0.23
+#wyzeapy==0.0.23
