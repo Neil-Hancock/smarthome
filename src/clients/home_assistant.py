@@ -39,7 +39,6 @@ class HomeAssistant:
             return
         elif power_state == PowerStates.POWER_OFF and not self.is_on(entity_id):
             return
-        _LOGGER.info(f'Setting {power_state.value} for {entity_id} with settings {kwargs}')
         # self.turn_on(entity_id) if power_state == PowerStates.POWER_ON else self.turn_off(entity_id)
         self.run_action(entity_id, power_state, **kwargs)
 
@@ -52,6 +51,7 @@ class HomeAssistant:
         service_type = entity_id.split('.')[0]
         try:
             headers = {'Authorization': f'Bearer {self._access_token}', 'Accept': 'application/json'}
+            _LOGGER.info(f'Setting {power_state.value} for {entity_id} with settings {kwargs}')
             response = requests.post(f'{HomeAssistant.BASE_URL}/services/{service_type}/{power_state.value}', json=payload, headers=headers)
         except requests.exceptions.RequestException as e:
             _LOGGER.warning(e)
