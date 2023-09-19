@@ -6,15 +6,14 @@ from random import randint
 import requests
 from pyvesync.vesyncbasedevice import VeSyncBaseDevice
 from pyvesync.vesyncoutlet import VeSyncOutlet
-from wyzeapy.exceptions import UnknownApiError
-from wyzeapy.base_client import Device
 from clients.location import Location
-from clients.vesync import  SmartVeSync
+from clients.vesync import SmartVeSync
 from clients.weather import OpenWeatherMap
-from clients.wyze import WyzeClient
+from clients.home_assistant import HomeAssistant, PowerStates
 
 _LOGGER = logging.getLogger(__name__)
 MIN_BRIGHTNESS = 30
+
 
 class Runtime:
     def __init__(self, vesync_manager: SmartVeSync):
@@ -35,7 +34,7 @@ class Runtime:
             raise TypeError('Both args must be set')
         if int(max_time) < 1:
             raise ValueError('max_time must be greater than 0')
-        
+
         if outlet in self._config:
             self._config[outlet]['max_time'] = max_time
         else:
@@ -60,7 +59,8 @@ class Runtime:
                     _LOGGER.info(f'{outlet} turned on')
 
     def is_max_time_exceeded(self, times: dict) -> bool:
-        return times['start'] > 0 and time.time() - times['start']  > times['max_time']
+        return times['start'] > 0 and time.time() - times['start'] > times['max_time']
+
 
 class AwayAutoOff:
     def __init__(self, time_variance: int, new_day_time, vesync_manager: SmartVeSync) -> None:
@@ -101,14 +101,16 @@ class AwayAutoOff:
                 _LOGGER.info(f'turned off {lamp} as per away auto off schedule')
                 times['actual_off_time'] = self._vary_time(times['actual_off_time'])
 
+
 class Lights:
-    def __init__(self, check_ambient_enabled: list, ambient_config: dict, vesync_manager: SmartVeSync, wyze_client: WyzeClient, weather_client: OpenWeatherMap) -> None:
+    def __init__(self, check_ambient_enabled: list, ambient_config: dict, vesync_manager: SmartVeSync,
+                 home_assistant: HomeAssistant, weather_client: OpenWeatherMap) -> None:
         self.check_ambient_enabled = check_ambient_enabled
         self.ambient_config = ambient_config
         self.vesync_manager = vesync_manager
-        self.wyze_client = wyze_client
+        self.home_assistant = home_assistant
         self.weather_client = weather_client
-        
+
     def check_sensor(self, sensor: str, lamp: str) -> None:
         sensor_vesync = self.vesync_manager.get_device_by_name(sensor)
         lamp_vesync = self.vesync_manager.get_device_by_name(lamp)
@@ -119,7 +121,7 @@ class Lights:
         if not is_connected(sensor_vesync) and lamp_vesync.is_on:
             lamp_vesync.turn_off()
             _LOGGER.info(f'turned off {lamp_vesync.device_name}')
-            
+
     def check_sensor_power(self, sensor: str, lamp: str):
         sensor_vesync = self.vesync_manager.get_device_by_name(sensor)
         lamp_vesync = self.vesync_manager.get_device_by_name(lamp)
@@ -131,60 +133,71 @@ class Lights:
 
     def check_sensor_wyze(self, sensor: str, bulb: str):
         sensor_vesync = self.vesync_manager.get_device_by_name(sensor)
-        bulb_wyze = self.wyze_client.get_device_by_nickname(bulb)
-        if is_connected(sensor_vesync) and not self.wyze_client.is_on(bulb_wyze):
-            self.configure_wyze_bulb(bulb_wyze)
-            _LOGGER.info(f'turned on {bulb_wyze.nickname}')
+        # bulb_wyze = self.home_assistant.get_device_by_entity_id(bulb)
+        if is_connected(sensor_vesync) and not self.home_assistant.is_on(bulb):
+            self.configure_wyze_bulb(bulb)
+            _LOGGER.info(f'turned on {bulb}')
 
-        if not is_connected(sensor_vesync) and self.wyze_client.is_on(bulb_wyze):
-            self.wyze_client.set_brightness(bulb_wyze, MIN_BRIGHTNESS)
-            self.wyze_client.turn_off(bulb_wyze)
-            _LOGGER.info(f'turned off {bulb_wyze.nickname}')
+        if not is_connected(sensor_vesync) and self.home_assistant.is_on(bulb):
+            self.home_assistant.run_action(bulb, PowerStates.POWER_OFF)
+            # self.wyze_client.set_brightness(bulb_wyze, MIN_BRIGHTNESS)
+            # self.wyze_client.turn_off(bulb_wyze)
+            _LOGGER.info(f'turned off {bulb}')
 
     def check_ambient(self, lamp: str) -> bool:
         if lamp not in self.check_ambient_enabled:
             return True
         if self.weather_client.is_cloudy:
-            _LOGGER.debug(f"it is cloudy ({self.weather_client.weather_description} with cloud coverage {self.weather_client.cloud_coverage}%), {lamp} not turing on")
+            _LOGGER.debug(
+                f"it is cloudy ({self.weather_client.weather_description} with cloud coverage {self.weather_client.cloud_coverage}%), {lamp} not turing on")
             return False
         if not self.weather_client.is_sun_up:
             _LOGGER.debug(f"it is dark, {lamp} not turing on")
             return False
-        return True   
+        return True
 
-    def configure_wyze_bulb(self, bulb: Device):
-        if bulb.nickname not in self.check_ambient_enabled:
-            self.wyze_client.turn_on(bulb)
+    def configure_wyze_bulb(self, bulb: str):
+        if bulb not in self.check_ambient_enabled:
+            self.home_assistant.run_action(bulb, PowerStates.POWER_ON)
             return
 
-        #fixed shedule based config
+        # fixed schedule based config
         if self.is_bed_time():
             _LOGGER.info('configuring bulb for feeding time...')
-            self.wyze_client.set_color(bulb, 'FF2000')
-            self.wyze_client.set_brightness(bulb, 75)
+            self.home_assistant.run_action(bulb, PowerStates.POWER_ON, brightness_pct=75, rgb_color=[255, 32, 0])
+            # self.wyze_client.set_color(bulb, 'FF2000')
+            # self.wyze_client.set_brightness(bulb, 75)
             return
 
-        #config based on ambient conditions
-        if self.weather_client.is_sun_in_range(self.ambient_config['daytime']['rise_offset'], self.ambient_config['daytime']['set_offset']):
+        # config based on ambient conditions
+        if self.weather_client.is_sun_in_range(self.ambient_config['daytime']['rise_offset'],
+                                               self.ambient_config['daytime']['set_offset']):
             _LOGGER.info('configuring bulb for daytime...')
-            self.wyze_client.set_color_temp(bulb, 3469)
+            # self.wyze_client.set_color_temp(bulb, 3469)
             if self.weather_client.is_sun_up and not self.weather_client.is_cloudy:
-                self.wyze_client.set_brightness(bulb, 100)
+                self.home_assistant.run_action(bulb, PowerStates.POWER_ON, brightness_pct=100, color_temp_kelvin=3469)
+                # self.wyze_client.set_brightness(bulb, 100)
             else:
-                self.wyze_client.set_brightness(bulb, 85)
-        elif self.weather_client.is_sun_in_range(self.ambient_config['dawn']['rise_offset'], self.ambient_config['daytime']['set_offset']):
+                # self.wyze_client.set_brightness(bulb, 85)
+                self.home_assistant.run_action(bulb, PowerStates.POWER_ON, brightness_pct=85, color_temp_kelvin=3469)
+        elif self.weather_client.is_sun_in_range(self.ambient_config['dawn']['rise_offset'],
+                                                 self.ambient_config['daytime']['set_offset']):
             _LOGGER.info('configuring bulb for dawn...')
-            self.wyze_client.set_color_temp(bulb, 1700)
-            self.wyze_client.set_brightness(bulb, 35)
+            # self.wyze_client.set_color_temp(bulb, 1700)
+            # self.wyze_client.set_brightness(bulb, 35)
+            self.home_assistant.run_action(bulb, PowerStates.POWER_ON, brightness_pct=35, color_temp_kelvin=1700)
         else:
-            self.wyze_client.set_color(bulb, 'FF2000')
-            if self.weather_client.is_sun_in_range(self.ambient_config['daytime']['rise_offset'], self.ambient_config['dusk']['set_offset']):
+            # self.wyze_client.set_color(bulb, 'FF2000')
+            if self.weather_client.is_sun_in_range(self.ambient_config['daytime']['rise_offset'],
+                                                   self.ambient_config['dusk']['set_offset']):
                 _LOGGER.info('configuring bulb for dusk...')
-                self.wyze_client.set_brightness(bulb, 40)
+                self.home_assistant.run_action(bulb, PowerStates.POWER_ON, brightness_pct=40, rgb_color=[255, 32, 0])
+                # self.wyze_client.set_brightness(bulb, 40)
             else:
                 _LOGGER.info('configuring bulb for nighttime...')
-                self.wyze_client.set_brightness(bulb, 30)
-    
+                # self.wyze_client.set_brightness(bulb, 30)
+                self.home_assistant.run_action(bulb, PowerStates.POWER_ON, brightness_pct=30, rgb_color=[255, 32, 0])
+
     def is_bed_time(self) -> bool:
         """Check if it's bed time
            TODO load start/stop time from yaml"""
@@ -193,7 +206,8 @@ class Lights:
         stop = datetime.time(hour=21, minute=30)
         now = datetime.datetime.now().time()
 
-        return start < now and stop > now
+        return start < now < stop
+
 
 def is_connected(device: VeSyncBaseDevice) -> bool:
     """Return true if VeSync device is connected."""
@@ -201,27 +215,28 @@ def is_connected(device: VeSyncBaseDevice) -> bool:
         return True
     return False
 
+
 def cycle_state(outlet: VeSyncOutlet) -> None:
     outlet.turn_off()
     time.sleep(2)
     outlet.turn_on()
-    
-#def get_device_name(device) -> str:
-    #if isinstance(device, Enum):
-        #return device.value
-    #if isinstance(device, VeSyncBaseDevice):
-        #return device.device_name
-    #if isinstance(device, str):
-        #return device
-    #raise TypeError(f'Type {type(device)} is unsupported')
 
-def main(config: dict, wyze_client: WyzeClient, location: Location):
+
+# def get_device_name(device) -> str:
+# if isinstance(device, Enum):
+# return device.value
+# if isinstance(device, VeSyncBaseDevice):
+# return device.device_name
+# if isinstance(device, str):
+# return device
+# raise TypeError(f'Type {type(device)} is unsupported')
+
+def main(config: dict, home_assistant: HomeAssistant, location: Location):
     lights_config = config['lights']
     HOME_UPDATE_FREQUENCY = lights_config['update_frequency']['home']
     AWAY_UPDATE_FREQUENCY = lights_config['update_frequency']['away']
-    
 
-    #figure out which vesync devices require details
+    # figure out which vesync devices require details
     update_details = []
     for _, val in lights_config['method_device_mapping']['vesync-vesync_power'].items():
         update_details.append(val)
@@ -237,7 +252,8 @@ def main(config: dict, wyze_client: WyzeClient, location: Location):
     _LOGGER.info('VeSync devices updated')
     weather = config['open_weather_map']
     weather_client = OpenWeatherMap(weather['api_key'], weather['lattitude'], weather['longitude'])
-    lights = Lights(lights_config['check_ambient_enabled'], lights_config['ambient'], vesync_manager, wyze_client, weather_client)
+    lights = Lights(lights_config['check_ambient_enabled'], lights_config['ambient'], vesync_manager, home_assistant,
+                    weather_client)
     runtime = Runtime(vesync_manager)
 
     if config['runtime'] is not None:
@@ -247,19 +263,19 @@ def main(config: dict, wyze_client: WyzeClient, location: Location):
     away_config = lights_config['away_auto_off']
     away_auto_off = AwayAutoOff(away_config['time_variance'], away_config['new_day_time'], vesync_manager)
     for key, val in away_config['devices'].items():
-            away_auto_off.add(key, val)
+        away_auto_off.add(key, val)
 
     while True:
         try:
-            #lights.check_sensor(Devices.OFFICE_SENSOR, Devices.OFFICE_LAMP)
+            # lights.check_sensor(Devices.OFFICE_SENSOR, Devices.OFFICE_LAMP)
             for sensor, light in lights_config['method_device_mapping']['vesync-vesync_state'].items():
                 lights.check_sensor(sensor, light)
 
-            #lights.check_sensor_power(Devices.NURSERY_SENSOR, Devices.NURSERY_FEEDING_LAMP)
+            # lights.check_sensor_power(Devices.NURSERY_SENSOR, Devices.NURSERY_FEEDING_LAMP)
             for sensor, light in lights_config['method_device_mapping']['vesync-vesync_power'].items():
                 lights.check_sensor_power(sensor, light)
 
-            #lights.check_sensor_wyze(Devices.NURSERY_SENSOR, Devices.NURSERY_BULB)
+            # lights.check_sensor_wyze(Devices.NURSERY_SENSOR, Devices.NURSERY_BULB)
             for sensor, light in lights_config['method_device_mapping']['vesync-wyze_state'].items():
                 lights.check_sensor_wyze(sensor, light)
 
@@ -274,9 +290,8 @@ def main(config: dict, wyze_client: WyzeClient, location: Location):
         except JSONDecodeError as json_error:
             _LOGGER.error(f'JSON Decode Error, retrying after a delay', exc_info=json_error)
             time.sleep(AWAY_UPDATE_FREQUENCY)
-        except UnknownApiError as unknown_api_error:
-            _LOGGER.error(f'Unknown Wyze API Error, retrying after a delay', exc_info=unknown_api_error)
-            time.sleep(AWAY_UPDATE_FREQUENCY)
-
+        # except UnknownApiError as unknown_api_error:
+        #     _LOGGER.error(f'Unknown Wyze API Error, retrying after a delay', exc_info=unknown_api_error)
+        #     time.sleep(AWAY_UPDATE_FREQUENCY)
 
         time.sleep(HOME_UPDATE_FREQUENCY if location.is_anyone_home(cached=True) else AWAY_UPDATE_FREQUENCY)

@@ -3,11 +3,11 @@ from json.decoder import JSONDecodeError
 import logging
 import time
 import requests
-from wyzeapy.exceptions import UnknownApiError
 from clients.location import Location
-from clients.wyze import PowerStates, WyzeClient
+from clients.home_assistant import HomeAssistant, PowerStates
 
 _LOGGER = logging.getLogger(__name__)
+
 
 class Scheduler():
     def __init__(self) -> None:
@@ -37,7 +37,8 @@ class Scheduler():
         else:
             return not (off_time < now and on_time > now)
 
-def main(config: dict, wyze_client: WyzeClient, location: Location):
+
+def main(config: dict, home_assistant: HomeAssistant, location: Location):
     cameras = config['cameras']
     UPDATE_FREQUENCY = cameras['update_frequency']
     scheduler = Scheduler()
@@ -46,18 +47,16 @@ def main(config: dict, wyze_client: WyzeClient, location: Location):
         scheduler.add(key, val['on_time'], val['off_time'])
         last_check[key] = True
 
-    while(True):
+    while True:
         for camera in cameras['device_names']:
             turn_on = not location.is_anyone_home() or scheduler.is_scheduled_on(camera)
             if last_check[camera] == turn_on:
                 power_state = PowerStates.POWER_ON if turn_on else PowerStates.POWER_OFF
                 try:
-                    wyze_client.set_power_state(camera, power_state)
+                    home_assistant.set_power_state(camera, power_state)
                 except requests.exceptions.ConnectionError as conn_error:
                     _LOGGER.error(f'Connection Error, retrying next update cycle', exc_info=conn_error)
                 except JSONDecodeError as json_error:
                     _LOGGER.error(f'JSON Decode Error, retrying next update cycle', exc_info=json_error)
-                except UnknownApiError as unknown_api_error:
-                    _LOGGER.error(f'Unknown Wyze API Error, retrying next update cycle', exc_info=unknown_api_error)
             last_check[camera] = turn_on
         time.sleep(UPDATE_FREQUENCY)

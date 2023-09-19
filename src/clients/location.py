@@ -6,7 +6,7 @@ from pushbullet import Pushbullet
 _LOGGER = logging.getLogger(__name__)
 
 class Location:
-    MOCK_NMAP = 'F0:AA:BB:CC:DD:EE'
+    MOCK_NMAP = 'F0:AA:BB:CC:DD:EE, F0:5C:77:FB:13:7F'
 
     def __init__(self, pushbullet_key, retry_count, ip_range, phone_macs):
         self.PUSHBULLET_API_KEY = pushbullet_key
