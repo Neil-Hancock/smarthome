@@ -18,6 +18,7 @@ class HomeAssistant:
         self._access_token = access_token
 
     def get_device_by_entity_id(self, entity_id: str) -> dict:
+        result = {}
         try:
             headers = {'Authorization': f'Bearer {self._access_token}', 'Accept': 'application/json'}
             response = requests.get(f'{HomeAssistant.BASE_URL}/states/{entity_id}', headers=headers)
@@ -26,9 +27,11 @@ class HomeAssistant:
         else:
             if response.status_code == requests.codes.ok and response.json() is not None:
                 _LOGGER.debug(f'Got response for {entity_id}, {response.json()}')
-                return response.json()
+                result = response.json()
             else:
                 _LOGGER.warning(f'Unable to fetch entity id, status_code = {response.status_code}')
+        finally:
+            return result
 
     def is_on(self, entity_id: str) -> bool:
         device = self.get_device_by_entity_id(entity_id)
