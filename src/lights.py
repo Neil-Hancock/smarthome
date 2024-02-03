@@ -283,7 +283,8 @@ def main(config: dict, home_assistant: HomeAssistant, location: Location):
             if not location.is_anyone_home(cached=True) and not location.is_anyone_home():
                 away_auto_off.check()
         except KeyError as key_error:
-            _LOGGER.error(f'KeyError, device missing for key "{key_error.args[0]}"')
+            _LOGGER.error(f'Key Error, retrying after a delay', exc_info=key_error)
+            time.sleep(AWAY_UPDATE_FREQUENCY)
         except requests.exceptions.ConnectionError as conn_error:
             _LOGGER.error(f'Connection Error, retrying after a delay', exc_info=conn_error)
             time.sleep(AWAY_UPDATE_FREQUENCY)
