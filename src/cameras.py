@@ -54,6 +54,8 @@ def main(config: dict, home_assistant: HomeAssistant, location: Location):
                 power_state = PowerStates.POWER_ON if turn_on else PowerStates.POWER_OFF
                 try:
                     home_assistant.set_power_state(camera, power_state)
+                except KeyError as key_error:
+                    _LOGGER.error(f'Key Error, retrying next update cycle', exc_info=key_error)
                 except requests.exceptions.ConnectionError as conn_error:
                     _LOGGER.error(f'Connection Error, retrying next update cycle', exc_info=conn_error)
                 except JSONDecodeError as json_error:
