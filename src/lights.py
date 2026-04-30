@@ -138,7 +138,7 @@ class Lights:
             self.configure_wyze_bulb(bulb)
             _LOGGER.info(f'turned on {bulb}')
 
-        if not is_connected(sensor_vesync) and self.home_assistant.is_on(bulb):
+        if not is_connected(sensor_vesync) and self.home_assistant.is_on(bulb) and not self.is_nightlight_time():
             self.home_assistant.run_action(bulb, PowerStates.POWER_OFF)
             # self.wyze_client.set_brightness(bulb_wyze, MIN_BRIGHTNESS)
             # self.wyze_client.turn_off(bulb_wyze)
@@ -163,7 +163,7 @@ class Lights:
 
         # fixed schedule based config
         if self.is_bed_time():
-            _LOGGER.info('configuring bulb for feeding time...')
+            _LOGGER.info('configuring bulb for bed time...')
             self.home_assistant.run_action(bulb, PowerStates.POWER_ON, brightness_pct=75, rgb_color=[255, 32, 0])
             # self.wyze_client.set_color(bulb, 'FF2000')
             # self.wyze_client.set_brightness(bulb, 75)
@@ -198,6 +198,15 @@ class Lights:
                 # self.wyze_client.set_brightness(bulb, 30)
                 self.home_assistant.run_action(bulb, PowerStates.POWER_ON, brightness_pct=30, rgb_color=[255, 32, 0])
 
+    def configure_wyze_bulb_nightlight(self, bulb):
+        color = [255, 0, 0] # Assume red and check if it's green time
+        green_time = datetime.time(hour=7, minute=30)
+        now = datetime.datetime.now().time()
+        if now > green_time:
+            color = [0, 255, 0]
+
+
+
     def is_bed_time(self) -> bool:
         """Check if it's bed time
            TODO load start/stop time from yaml"""
@@ -208,6 +217,15 @@ class Lights:
 
         return start < now < stop
 
+    def is_nightlight_time(self) -> bool:
+        """Check if it's nightlight time
+           TODO load start/stop time from yaml"""
+
+        start = datetime.time(hour=19, minute=00)
+        stop = datetime.time(hour=10, minute=00)
+        now = datetime.datetime.now().time()
+
+        return start < now or now < stop
 
 def is_connected(device: VeSyncBaseDevice) -> bool:
     """Return true if VeSync device is connected."""
