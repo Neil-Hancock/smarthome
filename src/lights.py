@@ -147,10 +147,10 @@ class Lights:
     def check_ambient(self, lamp: str) -> bool:
         if lamp not in self.check_ambient_enabled:
             return True
-        if self.weather_client.is_cloudy:
-            _LOGGER.debug(
-                f"it is cloudy ({self.weather_client.weather_description} with cloud coverage {self.weather_client.cloud_coverage}%), {lamp} not turing on")
-            return False
+        # if self.weather_client.is_cloudy:
+        #     _LOGGER.debug(
+        #         f"it is cloudy ({self.weather_client.weather_description} with cloud coverage {self.weather_client.cloud_coverage}%), {lamp} not turing on")
+        #     return False
         if not self.weather_client.is_sun_up:
             _LOGGER.debug(f"it is dark, {lamp} not turing on")
             return False
@@ -163,7 +163,7 @@ class Lights:
 
         # fixed schedule based config
         if self.is_bed_time():
-            _LOGGER.info('configuring bulb for feeding time...')
+            _LOGGER.info('configuring bulb for bed time...')
             self.home_assistant.run_action(bulb, PowerStates.POWER_ON, brightness_pct=75, rgb_color=[255, 32, 0])
             # self.wyze_client.set_color(bulb, 'FF2000')
             # self.wyze_client.set_brightness(bulb, 75)
@@ -174,18 +174,14 @@ class Lights:
                                                self.ambient_config['daytime']['set_offset']):
             _LOGGER.info('configuring bulb for daytime...')
             # self.wyze_client.set_color_temp(bulb, 3469)
-            if self.weather_client.is_sun_up and not self.weather_client.is_cloudy:
-                self.home_assistant.run_action(bulb, PowerStates.POWER_ON, brightness_pct=100, color_temp_kelvin=3469)
-                # self.wyze_client.set_brightness(bulb, 100)
-            else:
-                # self.wyze_client.set_brightness(bulb, 85)
-                self.home_assistant.run_action(bulb, PowerStates.POWER_ON, brightness_pct=85, color_temp_kelvin=3469)
+            # self.wyze_client.set_brightness(bulb, 100)
+            self.home_assistant.run_action(bulb, PowerStates.POWER_ON, brightness_pct=100, color_temp_kelvin=3469)
         elif self.weather_client.is_sun_in_range(self.ambient_config['dawn']['rise_offset'],
                                                  self.ambient_config['daytime']['set_offset']):
             _LOGGER.info('configuring bulb for dawn...')
             # self.wyze_client.set_color_temp(bulb, 1700)
             # self.wyze_client.set_brightness(bulb, 35)
-            self.home_assistant.run_action(bulb, PowerStates.POWER_ON, brightness_pct=35, color_temp_kelvin=1700)
+            self.home_assistant.run_action(bulb, PowerStates.POWER_ON, brightness_pct=50, color_temp_kelvin=2500)
         else:
             # self.wyze_client.set_color(bulb, 'FF2000')
             if self.weather_client.is_sun_in_range(self.ambient_config['daytime']['rise_offset'],
